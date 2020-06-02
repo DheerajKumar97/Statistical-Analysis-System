@@ -109,100 +109,6 @@ title;
 2. Writing to Multiple SAS Data Sets
 *******************************************************************************/
 
-/* 2.1 To create more than one data set, you specify the names of the SAS data sets you want to create in the DATA statement. Separate the data set names with a space.
-
-DATA <SAS-data-set-name-1 SAS-data-set-name-2 ... SAS-data-set-name-n>;
-
-
-2.2 OUTPUT statements with IF-THEN-ELSE
-
-You can use OUTPUT statements with IF-THEN-ELSE statements to conditionally write observations to a specific data set based on the value of a variable in the input data set.
-
-IF expression THEN statement;
-ELSE IF expression THEN statement;
-<ELSE IF expression THEN statement;>
-<...>
-<ELSE statement;>
-
-DATA usa australia other;
-   SET orion.employee_addresses;
-   IF Country='AU' THEN
-      OUTPUT australia;
-   ELSE IF Country='US' THEN
-      OUTPUT usa;
-   ELSE
-      OUTPUT other;
-RUN;
-
-For conditional processing, it's most efficient to check for values in order of decreasing frequency. Revise the program, as shown below, to check Country='US' first.
-
-data usa australia other;
-   set orion.employee_addresses;
-   if Country='US' then output usa;
-   else if Country='AU' then output australia;
-   else output other;
-run;
-title 'Employees in the United States';
-proc print data=usa;
-run;
-
-title 'Employees in Australia';
-proc print data=australia;
-run;
-
-title 'Non US and AU Employees';
-proc print data=other;
-run;
-title;
-
-The values of Country were miscoded as lowercase. Now that you've seen the data in the other data set, you could fix the data or revise the conditional logic to look for both uppercase and lowercase values, or you could use a function in the IF statement to change the values of Country to uppercase.
-
-
-2.3 OUTPUT statements with SELECT group
-
-Another way to perform conditional processing in a DATA step is to use a SELECT group. It's more efficient to use a SELECT group rather than a series of IF-THEN statements when you have a long series of mutually exclusive conditions.
-
-A SELECT group contains these statements:
-- a SELECT statement that begins the group, followed by an optional SELECT expresion
-- one or more WHEN statements that identify statements to execute when a condition is true
-- an optional OTHERWISE statement that specifies a statement to execute if none of the WHEN conditions are true
-- an END statement that ends the group.
-
-SELECT <(select-expression)>;
-        WHEN-1 (when-expression-1 <…, when-expression-n>) statement;
-        WHEN-n (when-expression-1 <…, when-expression-n>) statement;
-<OTHERWISE statement;>
-END;
-
-DATA usa australia other;
-   SET orion.employee_addresses;
-   SELECT (Country);
-      WHEN ('US','us') OUTPUT usa;
-      WHEN ('AU','au') OUTPUT australia;
-      OTHERWISE OUTPUT other;
-   END;
-RUN;
-
-The optional SELECT expression specifies any valid SAS expression. Often a variable name is used as the SELECT expression. When you specify a SELECT expression, SAS evaluates the expression and then compares the result to each when-expression. When a true condition is encountered, the associated statement is executed and the remaining WHEN statements are skipped.
-
-If you omit the SELECT expression, SAS evaluates each when-expression until it finds a true condition, then behaves as described above. This form of SELECT is useful when you want to check the value of more than one variable using a compound condition, or check for an inequality. One thing to keep in mind is that SAS executes WHEN statements in the order that you write them and once a when-expression is true, no other when-expressions are evaluated.
-
-
-2.3.2 null OTHERWISE
-
-Although the OTHERWISE statement is optional, omitting it will result in an error if all when-expressions are false. You can use OTHERWISE with a null statement to prevent SAS from issuing an error message.
-
-data usa australia other;
-   set orion.employee_addresses;
-   select (Country);
-      when ('US') output usa;
-      when ('AU') output australia;
-      otherwise;
-   end;
-run;
-
-A null OTHERWISE statement can be useful when you want to ignore certain values. For example,  if you only want to create data sets for employees in the United States and Australia, then you would want to ignore values for other countries.
-
 
 2.3.3. DO-END groups in a SELECT Group
 
@@ -403,16 +309,6 @@ DATA usa;
   <additional SAS statements>;
 run;
 
-/* Remember that when you associate the DROP= and KEEP= data set options with an output data set, the variables are still available for processing.
-
-In contrast, when you associate these options with an input data set in a SET statement, the variables are not read into the program data vector, and therefore they are not available for processing.
-
-For cases where you don't need all the variables in an input data set, this is an efficient way to drop them so that they aren't processed at all. */
-
-/* Example
-You want to drop 'Employee_ID' and 'Country' from every data set, and you want to drop 'State' from the australia data set. You can do this by using a combination of options and statements. Let's start over with the code that creates the three data sets with all nine variables.
-
-You can use the DROP= data set option (1) in the SET statement to drop Employee_ID from the input data because it's not used for processing in the DATA step. */
 
 data  usa
       australia(DROP=State) /* (3)*/
@@ -428,20 +324,6 @@ data  usa
       output other;
 run;
 
-/* Next you want to drop Country from every output data set, but the variable needs to be available for processing.
-
-Here's a question: What's the simplest way to drop Country from all three output data sets? It’s easiest to use a DROP statement (2).
-
-You could use the DROP= data set option to drop the variable from each output data set individually
-data usa(DROP=Country) australia(DROP=State, Country) otherDROP=Country);
-but it's more concise to use a DROP statement.
-
-Finally, you use the DROP= data set option (3) to drop 'State' from the australia data set.
-
-When the code compiles, only the Employee_ID variable is dropped from the input data, and all other variables are included in the program data vector and are available for processing. */
-
-/* Other Example:
-The SAS data set car has the variables CarID, CarType, Miles, and Gallons. Select the DATA step or steps that creates the ratings data set with the variables CarType and MPG. */
 
 data ratings(keep=CarType MPG);
    set car(drop=CarID);
@@ -462,79 +344,7 @@ run;
 *   4. Controlling Which Observations Are Read
 ******************************************************************************/
 
-/* 4.1 use FIRSTOBS= and OBS= options in an SET statement
 
-You can use the OBS= and FIRSTOBS= data set options to limit the number of observations that SAS processes.
-
-The FIRSTOBS= data set option specifies a starting point for processing an input data set. By default, FIRSTOBS=1.
-
-The OBS= data set option specifies the number of the last observation to process. It does not specify how many observations should be processed.
-
-You can use FIRSTOBS= and OBS= together to define a range of observations for SAS to process.
-
-SAS_data_set_name(OBS=n)
-  E.g. (OBS=100) data set option in this SET statement causes the DATA step to stop processing after observation 100.
-SAS_data_set_name(FIRSTOBS=n)
-  E.g. (FIRSTOBS=20) data set option to specify a starting point for processing an input data set, so the SET statement starts reading observations from the input data set at observation number 20 and continues processing until the last observation is read.
-SAS_data_set_name(FIRSTOBS=n OBS=n)
-  Used together to define a range of observations in the data set.
-  E.g. (FIRSTOBS=50 OBS=100) - these data set options cause the SET statement to read 51 observations from the data set. Processing begins with observation 50 and ends after observation 100.
-
-Both the FIRSTOBS= and the OBS= options are used with input data sets - SET statement. You cannot use either option with output data sets.
-When you limit the number of observations that SAS reads from input data, the number of observations in your output data is also limited.
-
-
-4.2 Use FIRSTOBS= and OBS= options in an INFILE statement
-
-You can also use FIRSTOBS= and OBS= options in an INFILE statement to control which records are read when you read raw data files.
-
-DATA employees;
-  INFILE 'emps.dat' FIRSTOBS=11 and OBS=15;
-  INPUT @1 EmpID 8. @9 EmpName $40. @153 Country $2.;
-RUN;
-PROC PRINT DATA=employees;
-RUN;
-
-Notice that the syntax is different. In an INFILE statement, the options follow the filename, but they are not enclosed in parentheses.
-
-4.3 Use FIRSTOBS= and OBS= options in an SAS procedures (e.g. PROC PRINT step)
-
-You can also use FIRSTOBS= and OBS= in a procedure step, to limit the number of observations that are processed.
-
-DATA new;
-   SET old(FIRSTOBS=100 OBS=200);
-RUN;
-PROC PRINT DATA=new(OBS=50);
-RUN;
-
-The data set options in the SET statement direct SAS to begin reading at observation 100 and stop after observation 200. The data set option in the PROC PRINT step directs SAS to stop printing after 50 observations.
-
-PROC PRINT DATA=orion.employee_addresses(OBS=10);
-  WHERE Country='AU';
-  VAR Employee_Name City State Country;
-RUN;
-
-If a WHERE statement is used to subset the observations, it is applied before the FIRSTOBS= and OBS= data set options. */
-
-/*---PRACTICE 5---*/
-/*
- * Practice L1-5: Specify Variables and Observations
- */
-
-
-/*
-Task
-In this practice, you create two data sets based on the value of a variable in the input data. You specify which variables to include in the output data sets and you specify the observations to print.
-The data set orion.employee_organization contains information on employee job titles, departments, and managers. Create two data sets: one for the Sales department and another for the Executive department.
-
-Reminder: Make sure you've defined the Orion library.
-1.Read orion.employee_organization and create the output data sets work.salesinfo and work.execinfo.
-2.Output to these data sets depending on whether the value of Department is Sales or Executives, respectively. Ignore all other values of Department.
-3.The work.salesinfo data set should contain three variables (Employee_ID, Job_Title, and Manager_ID).
-4.The work.execinfo data set should contain two variables (Employee_ID and Job_Title).
-5.Print only the first six observations from work.salesinfo. Add an appropriate title.
-6.Print only the second and third observations from work.execinfo. Add an appropriate title.
- */
 
 DATA work.saleinfo work.execinfo(DROP=Manager_ID);
 	SET orion.employee_organization;
